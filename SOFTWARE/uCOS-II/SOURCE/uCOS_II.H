@@ -1148,7 +1148,7 @@ void          OSTickISR(void);
 #error  "OS_CFG.H, Missing OS_SCHED_LOCK_EN: Include code for OSSchedLock() and OSSchedUnlock()"
 #endif
 
-#define MAXLOGNUM 20
+#define MAXLOGNUM 35
 typedef struct{
     INT8U num;
     INT16U clk[MAXLOGNUM];

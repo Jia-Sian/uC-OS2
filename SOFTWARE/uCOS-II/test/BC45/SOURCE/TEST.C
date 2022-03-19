@@ -3,6 +3,8 @@
 #define  TASK_STK_SIZE                 512       /* Size of each task's stacks (# of WORDs)            */
 #define  N_TASKS                        10       /* Number of identical tasks                          */
 
+Logs logs;
+
 typedef struct{
     INT8U c,p; // INT32U will fail
 }Job;
@@ -12,8 +14,22 @@ void startSim(void *pdata){
     INT8U c=job->c;
     INT8U p=job->p;
     INT16U nextp=p,cur; // first period start at clk=0
+    INT8U idx;
     while(1){
-        while(OSTCBCur->counter<c){}
+        while(OSTCBCur->counter<c){
+            if(OSTimeGet()>nextp){
+                OS_ENTER_CRITICAL();
+                idx=logs.num;
+                if(idx<MAXLOGNUM){
+                    logs.clk[idx]=OSTimeGet();
+                    logs.vol[idx]=2;
+                    logs.src[idx]=OSTCBCur->OSTCBPrio;
+                    logs.num+=1;
+                }
+                OS_EXIT_CRITICAL();
+                break;
+            }
+        }
 
         OS_ENTER_CRITICAL();
         OSTCBCur->counter=0;
@@ -39,23 +55,23 @@ void initSim(INT8U num){
     }
 }
 
-Logs logs;
-
-void printLogs(void){
+void printLogs(void){ // Don't lock here cuz we have top priority.
     INT8U cur;
     for(cur=0;cur<logs.num;++cur){
         printf("%d\t",logs.clk[cur]);
         if(logs.vol[cur]==0){
             printf("preempt         ");
-        }else{
+            printf("%d\t%d\n",logs.src[cur],logs.dst[cur]);
+        }else if(logs.vol[cur]==1){
             printf("complete        ");
+            printf("%d\t%d\n",logs.src[cur],logs.dst[cur]);
+        }else{
+            printf("killed          ");
+            printf("%d\n",logs.src[cur]);
         }
-        printf("%d\t%d\n",logs.src[cur],logs.dst[cur]);
     }
 
-    OS_ENTER_CRITICAL();
     logs.num=0;
-    OS_EXIT_CRITICAL();
 }
 
 void  TaskStart(void *pdata){
@@ -65,7 +81,7 @@ void  TaskStart(void *pdata){
     OS_EXIT_CRITICAL();
     OSStatInit();                                          /* Initialize uC/OS-II's statistics         */
 
-    initSim(2);
+    initSim(3);
     OSTimeSet(0);
     while(1){
         OSTimeDly(OS_TICKS_PER_SEC);
