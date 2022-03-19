@@ -169,12 +169,14 @@ void  OSIntEnter (void)
 *********************************************************************************************************
 */
 
+extern Logs logs;
+
 void  OSIntExit (void)
 {
 #if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
     OS_CPU_SR  cpu_sr;
 #endif
-    
+    INT8U idx;
     
     if (OSRunning == TRUE) {
         OS_ENTER_CRITICAL();
@@ -185,6 +187,15 @@ void  OSIntExit (void)
             OSIntExitY    = OSUnMapTbl[OSRdyGrp];          /* ... and not locked.                      */
             OSPrioHighRdy = (INT8U)((OSIntExitY << 3) + OSUnMapTbl[OSRdyTbl[OSIntExitY]]);
             if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy */
+                idx=logs.num;
+                if(idx<MAXLOGNUM){
+                    logs.clk[idx]=OSTimeGet();
+                    logs.vol[idx]=0;
+                    logs.src[idx]=OSPrioCur;
+                    logs.dst[idx]=OSPrioHighRdy;
+                    logs.num+=1;
+                }
+
                 OSTCBHighRdy  = OSTCBPrioTbl[OSPrioHighRdy];
                 OSCtxSwCtr++;                              /* Keep track of the number of ctx switches */
                 OSIntCtxSw();                              /* Perform interrupt level ctx switch       */
@@ -877,13 +888,22 @@ void  OS_Sched (void)
     OS_CPU_SR  cpu_sr;
 #endif    
     INT8U      y;
-
+    INT8U idx;
 
     OS_ENTER_CRITICAL();
     if ((OSIntNesting == 0) && (OSLockNesting == 0)) { /* Sched. only if all ISRs done & not locked    */
         y             = OSUnMapTbl[OSRdyGrp];          /* Get pointer to HPT ready to run              */
         OSPrioHighRdy = (INT8U)((y << 3) + OSUnMapTbl[OSRdyTbl[y]]);
         if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy     */
+            idx=logs.num;
+            if(idx<MAXLOGNUM){
+                logs.clk[idx]=OSTimeGet();
+                logs.vol[idx]=1;
+                logs.src[idx]=OSPrioCur;
+                logs.dst[idx]=OSPrioHighRdy;
+                logs.num+=1;
+            }
+
             OSTCBHighRdy = OSTCBPrioTbl[OSPrioHighRdy];
             OSCtxSwCtr++;                              /* Increment context switch counter             */
             OS_TASK_SW();                              /* Perform a context switch                     */
