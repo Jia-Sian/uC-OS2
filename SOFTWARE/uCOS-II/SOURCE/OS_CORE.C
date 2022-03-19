@@ -370,6 +370,11 @@ void  OSTimeTick (void)
 
 
     OSTimeTickHook();                                      /* Call user definable hook                 */
+
+    OS_ENTER_CRITICAL();
+    (OSTCBCur->counter)+=1;
+    OS_EXIT_CRITICAL();
+
 #if OS_TIME_GET_SET_EN > 0   
     OS_ENTER_CRITICAL();                                   /* Update the 32-bit tick counter           */
     OSTime++;
