@@ -478,7 +478,7 @@ INT16U  OSEventPendMulti (OS_EVENT **pevents_pend, OS_EVENT **pevents_rdy, void 
                  OSTCBCur->OSTCBStatPend = OS_STAT_PEND_TO;
                  OS_EventTaskRemoveMulti(OSTCBCur, pevents_pend);
              }
-			 break;
+             break;
 
         case OS_STAT_PEND_TO:
         default:                                        /* ... remove task from events' wait lists     */
@@ -648,12 +648,14 @@ void  OSIntEnter (void)
 *********************************************************************************************************
 */
 
+extern Logs logs;
+
 void  OSIntExit (void)
 {
 #if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
     OS_CPU_SR  cpu_sr = 0;
 #endif
-
+    INT8U idx;
 
 
     if (OSRunning == OS_TRUE) {
@@ -665,6 +667,14 @@ void  OSIntExit (void)
             if (OSLockNesting == 0) {                      /* ... and not locked.                      */
                 OS_SchedNew();
                 if (OSPrioHighRdy != OSPrioCur) {          /* No Ctx Sw if current task is highest rdy */
+                    idx=logs.num;
+                    if(idx<MAXLOGNUM){
+                        logs.clk[idx]=OSTimeGet();
+                        logs.vol[idx]=0;
+                        logs.src[idx]=OSPrioCur;
+                        logs.dst[idx]=OSPrioHighRdy;
+                        logs.num+=1;
+                    }
                     OSTCBHighRdy  = OSTCBPrioTbl[OSPrioHighRdy];
 #if OS_TASK_PROFILE_EN > 0
                     OSTCBHighRdy->OSTCBCtxSwCtr++;         /* Inc. # of context switches to this task  */
@@ -863,6 +873,9 @@ void  OSTimeTick (void)
 #if OS_TIME_TICK_HOOK_EN > 0
     OSTimeTickHook();                                      /* Call user definable hook                     */
 #endif
+    OS_ENTER_CRITICAL();
+    (OSTCBCur->counter)+=1;
+    OS_EXIT_CRITICAL();
 #if OS_TIME_GET_SET_EN > 0
     OS_ENTER_CRITICAL();                                   /* Update the 32-bit tick counter               */
     OSTime++;
@@ -1612,7 +1625,7 @@ void  OS_Sched (void)
 #if OS_CRITICAL_METHOD == 3                            /* Allocate storage for CPU status register     */
     OS_CPU_SR  cpu_sr = 0;
 #endif
-
+    INT8U idx;
 
 
     OS_ENTER_CRITICAL();
@@ -1620,6 +1633,14 @@ void  OS_Sched (void)
         if (OSLockNesting == 0) {                      /* ... scheduler is not locked                  */
             OS_SchedNew();
             if (OSPrioHighRdy != OSPrioCur) {          /* No Ctx Sw if current task is highest rdy     */
+                idx=logs.num;
+                if(idx<MAXLOGNUM){
+                    logs.clk[idx]=OSTimeGet();
+                    logs.vol[idx]=1;
+                    logs.src[idx]=OSPrioCur;
+                    logs.dst[idx]=OSPrioHighRdy;
+                    logs.num+=1;
+                }
                 OSTCBHighRdy = OSTCBPrioTbl[OSPrioHighRdy];
 #if OS_TASK_PROFILE_EN > 0
                 OSTCBHighRdy->OSTCBCtxSwCtr++;         /* Inc. # of context switches to this task      */

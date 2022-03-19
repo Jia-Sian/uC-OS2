@@ -656,6 +656,7 @@ typedef struct os_tcb {
 #if OS_TASK_NAME_SIZE > 1
     INT8U            OSTCBTaskName[OS_TASK_NAME_SIZE];
 #endif
+    INT32U counter;
 } OS_TCB;
 
 /*$PAGE*/
@@ -1922,6 +1923,15 @@ void          OSCtxSw                 (void);
 #endif
 
 #endif  /* ------------------------ SAFETY_CRITICAL_RELEASE ------------------------ */
+
+#define MAXLOGNUM 35
+typedef struct{
+    INT8U num;
+    INT16U clk[MAXLOGNUM];
+    INT8U vol[MAXLOGNUM];
+    INT8U src[MAXLOGNUM];
+    INT8U dst[MAXLOGNUM];
+}Logs;
 
 #ifdef __cplusplus
 }

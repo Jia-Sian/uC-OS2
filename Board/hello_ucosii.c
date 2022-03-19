@@ -27,64 +27,99 @@
 *     minutes per iteration.                                             *
 **************************************************************************/
 
-
 #include <stdio.h>
 #include "includes.h"
 
-/* Definition of Task Stacks */
-#define   TASK_STACKSIZE       2048
-OS_STK    task1_stk[TASK_STACKSIZE];
-OS_STK    task2_stk[TASK_STACKSIZE];
+#define  TASK_STK_SIZE                 512       /* Size of each task's stacks (# of WORDs)            */
+#define  N_TASKS                        10       /* Number of identical tasks                          */
 
-/* Definition of Task Priorities */
+Logs logs;
 
-#define TASK1_PRIORITY      1
-#define TASK2_PRIORITY      2
+typedef struct{
+    INT8U c,p; // INT32U will fail
+}Job;
 
-/* Prints "Hello World" and sleeps for three seconds */
-void task1(void* pdata)
-{
-  while (1)
-  { 
-    printf("Hello from task1\n");
-    OSTimeDlyHMSM(0, 0, 3, 0);
-  }
+void startSim(void *pdata){
+#if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
+    OS_CPU_SR  cpu_sr;
+#endif
+    Job* job=(Job*)pdata;
+    INT8U c=job->c;
+    INT8U p=job->p;
+    INT16U nextp=p,cur; // first period start at clk=0
+    INT8U idx;
+    while(1){
+        while(OSTCBCur->counter<c){
+            if(OSTimeGet()>nextp){
+                OS_ENTER_CRITICAL();
+                idx=logs.num;
+                if(idx<MAXLOGNUM){
+                    logs.clk[idx]=OSTimeGet();
+                    logs.vol[idx]=2;
+                    logs.src[idx]=OSTCBCur->OSTCBPrio;
+                    logs.num+=1;
+                }
+                OS_EXIT_CRITICAL();
+                break;
+            }
+        }
+
+        OS_ENTER_CRITICAL();
+        OSTCBCur->counter=0;
+        OS_EXIT_CRITICAL();
+
+        cur=OSTimeGet();
+        if(nextp>cur)OSTimeDly(nextp-cur);
+        nextp+=p;
+    }
 }
-/* Prints "Hello World" and sleeps for three seconds */
-void task2(void* pdata)
-{
-  while (1)
-  { 
-    printf("Hello from task2\n");
-    OSTimeDlyHMSM(0, 0, 3, 0);
-  }
+
+void initSim(INT8U num){
+    // declaration should be put at begining for old compiler
+    static OS_STK TaskStk[N_TASKS][TASK_STK_SIZE];
+    static Job jobs[5];
+    INT8U i;
+
+    jobs[0].c=1;jobs[0].p=3;
+    jobs[1].c=3;jobs[1].p=6;
+    jobs[2].c=4;jobs[2].p=9;
+    for(i=0;i<num;++i){
+        OSTaskCreate(startSim,(void *)(jobs+i),&TaskStk[i][TASK_STK_SIZE-1],i+1); // RM policy
+    }
 }
-/* The main function creates two task and starts multi-tasking */
-int main(void)
-{
-  
-  OSTaskCreateExt(task1,
-                  NULL,
-                  (void *)&task1_stk[TASK_STACKSIZE-1],
-                  TASK1_PRIORITY,
-                  TASK1_PRIORITY,
-                  task1_stk,
-                  TASK_STACKSIZE,
-                  NULL,
-                  0);
-              
-               
-  OSTaskCreateExt(task2,
-                  NULL,
-                  (void *)&task2_stk[TASK_STACKSIZE-1],
-                  TASK2_PRIORITY,
-                  TASK2_PRIORITY,
-                  task2_stk,
-                  TASK_STACKSIZE,
-                  NULL,
-                  0);
-  OSStart();
-  return 0;
+
+void printLogs(void){ // Don't lock here cuz we have top priority.
+    INT8U cur;
+    for(cur=0;cur<logs.num;++cur){
+        printf("%d\t",logs.clk[cur]);
+        if(logs.vol[cur]==0){
+            printf("preempt         ");
+            printf("%d\t%d\n",logs.src[cur],logs.dst[cur]);
+        }else if(logs.vol[cur]==1){
+            printf("complete        ");
+            printf("%d\t%d\n",logs.src[cur],logs.dst[cur]);
+        }else{
+            printf("killed          ");
+            printf("%d\n",logs.src[cur]);
+        }
+    }
+
+    logs.num=0;
+}
+
+void  TaskStart(void *pdata){
+    initSim(3);
+    OSTimeSet(0);
+    while(1){
+        OSTimeDly(OS_TICKS_PER_SEC);
+        printLogs();
+    }
+}
+
+void  main(void){
+    static OS_STK TaskStartStk[TASK_STK_SIZE];
+    OSTaskCreate(TaskStart, (void *)0, &TaskStartStk[TASK_STK_SIZE - 1], 0);
+    OSStart();
 }
 
 /******************************************************************************
