@@ -657,6 +657,8 @@ typedef struct os_tcb {
     INT8U            OSTCBTaskName[OS_TASK_NAME_SIZE];
 #endif
     INT32U counter;
+    INT16U deadline_valid;
+    INT16U deadline;
 } OS_TCB;
 
 /*$PAGE*/

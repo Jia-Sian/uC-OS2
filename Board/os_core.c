@@ -650,12 +650,35 @@ void  OSIntEnter (void)
 
 extern Logs logs;
 
+INT8U getEarliestDeadlineUserTask(void){
+    OS_TCB *tcb=OSTCBList,*tar=0;
+    INT16U cur=OSTimeGet();
+
+    while(tcb){
+        if(tcb->OSTCBStat==OS_STAT_RDY&&tcb->OSTCBDly==0&&tcb->deadline_valid==1){ // ready user task
+            if(tar==0){
+                tar=tcb;
+            }else{
+                if((tcb->deadline-cur)<(tar->deadline-cur)){
+                    tar=tcb;
+                }else if((tcb->deadline-cur)==(tar->deadline-cur)){
+                    if(tcb->OSTCBPrio<tar->OSTCBPrio)tar=tcb;
+                }
+            }
+        }
+        tcb=tcb->OSTCBNext;
+    }
+
+    if(tar==0)return 255;
+    return tar->OSTCBPrio;
+}
+
 void  OSIntExit (void)
 {
 #if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
     OS_CPU_SR  cpu_sr = 0;
 #endif
-    INT8U idx;
+    INT8U idx,edut;
 
 
     if (OSRunning == OS_TRUE) {
@@ -666,6 +689,8 @@ void  OSIntExit (void)
         if (OSIntNesting == 0) {                           /* Reschedule only if all ISRs complete ... */
             if (OSLockNesting == 0) {                      /* ... and not locked.                      */
                 OS_SchedNew();
+                edut=getEarliestDeadlineUserTask();
+                if(edut!=255)OSPrioHighRdy=edut;
                 if (OSPrioHighRdy != OSPrioCur) {          /* No Ctx Sw if current task is highest rdy */
                     idx=logs.num;
                     if(idx<MAXLOGNUM){
@@ -1625,13 +1650,15 @@ void  OS_Sched (void)
 #if OS_CRITICAL_METHOD == 3                            /* Allocate storage for CPU status register     */
     OS_CPU_SR  cpu_sr = 0;
 #endif
-    INT8U idx;
+    INT8U idx,edut;
 
 
     OS_ENTER_CRITICAL();
     if (OSIntNesting == 0) {                           /* Schedule only if all ISRs done and ...       */
         if (OSLockNesting == 0) {                      /* ... scheduler is not locked                  */
             OS_SchedNew();
+            edut=getEarliestDeadlineUserTask();
+            if(edut!=255)OSPrioHighRdy=edut;
             if (OSPrioHighRdy != OSPrioCur) {          /* No Ctx Sw if current task is highest rdy     */
                 idx=logs.num;
                 if(idx<MAXLOGNUM){
@@ -2037,6 +2064,8 @@ INT8U  OS_TCBInit (INT8U prio, OS_STK *ptos, OS_STK *pbos, INT16U id, INT32U stk
         OSRdyGrp               |= ptcb->OSTCBBitY;         /* Make task ready to run                   */
         OSRdyTbl[ptcb->OSTCBY] |= ptcb->OSTCBBitX;
         OSTaskCtr++;                                       /* Increment the #tasks counter             */
+        ptcb->counter=0;
+        ptcb->deadline_valid=0;
         OS_EXIT_CRITICAL();
         return (OS_ERR_NONE);
     }
