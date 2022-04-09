@@ -16,8 +16,6 @@ void startSim(void *pdata){
     INT16U cur; // first period start at clk=0
     INT8U idx;
 
-    OSTCBCur->deadline=p; // reset deadline
-    OSTCBCur->deadline_valid=1;
     while(1){
         while(OSTCBCur->counter<c){
             if(OSTimeGet()>OSTCBCur->deadline){
@@ -52,10 +50,6 @@ void initSim(INT8U num){
     static Job jobs[5];
     INT8U i;
 
-    // Note: 
-    //  jobs must be ordered by "p". This make job with larger "p" work properly.
-    //  At t0, If job with smaller "p" and larger deadline start running before job with larger "p",
-    //  it means CPU utilization is 100% before t0. (Here is contradiction if total utilization <= 100%)
     if(num==2){
         jobs[0].c=1;jobs[0].p=3;
         jobs[1].c=3;jobs[1].p=5;
@@ -68,6 +62,15 @@ void initSim(INT8U num){
     for(i=0;i<num;++i){
         OSTaskCreate(startSim,(void *)(jobs+i),&TaskStk[i][TASK_STK_SIZE-1],i+1); // EDF policy
     }
+
+    // avoid preemption of task with deadline_valid=1
+    OS_ENTER_CRITICAL();
+    for(i=0;i<num;++i){
+        OSTCBPrioTbl[i+1]->deadline_valid=1;
+        OSTCBPrioTbl[i+1]->deadline=jobs[i].p;
+    }
+    OSTimeSet(0);
+    OS_EXIT_CRITICAL();
 }
 
 void printLogs(void){ // Don't lock here cuz we have top priority.
@@ -95,8 +98,7 @@ void  TaskStart(void *pdata){
     OS_EXIT_CRITICAL();
     OSStatInit();                                          /* Initialize uC/OS-II's statistics         */
 
-    initSim(2);
-    OSTimeSet(0);
+    initSim(3);
     while(1){
         OSTimeDly(OS_TICKS_PER_SEC);
         printLogs();
