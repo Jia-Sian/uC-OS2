@@ -13,11 +13,14 @@ void startSim(void *pdata){
     Job* job=(Job*)pdata;
     INT8U c=job->c;
     INT8U p=job->p;
-    INT16U nextp=p,cur; // first period start at clk=0
+    INT16U cur; // first period start at clk=0
     INT8U idx;
+
+    OSTCBCur->deadline=p; // reset deadline
+    OSTCBCur->deadline_valid=1;
     while(1){
         while(OSTCBCur->counter<c){
-            if(OSTimeGet()>nextp){
+            if(OSTimeGet()>OSTCBCur->deadline){
                 OS_ENTER_CRITICAL();
                 idx=logs.num;
                 if(idx<MAXLOGNUM){
@@ -33,11 +36,13 @@ void startSim(void *pdata){
 
         OS_ENTER_CRITICAL();
         OSTCBCur->counter=0;
+        OSTCBCur->deadline+=p;
         OS_EXIT_CRITICAL();
 
         cur=OSTimeGet();
-        if(nextp>cur)OSTimeDly(nextp-cur);
-        nextp+=p;
+        if(OSTCBCur->deadline-p>cur){
+            OSTimeDly(OSTCBCur->deadline-p-cur);
+        }
     }
 }
 
@@ -47,11 +52,21 @@ void initSim(INT8U num){
     static Job jobs[5];
     INT8U i;
 
-    jobs[0].c=1;jobs[0].p=3;
-    jobs[1].c=3;jobs[1].p=6;
-    jobs[2].c=4;jobs[2].p=9;
+    // Note: 
+    //  jobs must be ordered by "p". This make job with larger "p" work properly.
+    //  At t0, If job with smaller "p" and larger deadline start running before job with larger "p",
+    //  it means CPU utilization is 100% before t0. (Here is contradiction if total utilization <= 100%)
+    if(num==2){
+        jobs[0].c=1;jobs[0].p=3;
+        jobs[1].c=3;jobs[1].p=5;
+    }else{
+        jobs[0].c=1;jobs[0].p=4;
+        jobs[1].c=2;jobs[1].p=5;
+        jobs[2].c=2;jobs[2].p=10;
+    }
+
     for(i=0;i<num;++i){
-        OSTaskCreate(startSim,(void *)(jobs+i),&TaskStk[i][TASK_STK_SIZE-1],i+1); // RM policy
+        OSTaskCreate(startSim,(void *)(jobs+i),&TaskStk[i][TASK_STK_SIZE-1],i+1); // EDF policy
     }
 }
 
@@ -70,7 +85,6 @@ void printLogs(void){ // Don't lock here cuz we have top priority.
             printf("%d\n",logs.src[cur]);
         }
     }
-
     logs.num=0;
 }
 
@@ -81,7 +95,7 @@ void  TaskStart(void *pdata){
     OS_EXIT_CRITICAL();
     OSStatInit();                                          /* Initialize uC/OS-II's statistics         */
 
-    initSim(3);
+    initSim(2);
     OSTimeSet(0);
     while(1){
         OSTimeDly(OS_TICKS_PER_SEC);

@@ -409,6 +409,8 @@ typedef struct os_tcb {
     BOOLEAN        OSTCBDelReq;        /* Indicates whether a task needs to delete itself              */
 #endif
     INT32U counter;
+    INT16U deadline_valid;
+    INT16U deadline;
 } OS_TCB;
 
 /*$PAGE*/

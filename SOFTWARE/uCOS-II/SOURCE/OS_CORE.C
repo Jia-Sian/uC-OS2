@@ -171,12 +171,35 @@ void  OSIntEnter (void)
 
 extern Logs logs;
 
+INT8U getEarliestDeadlineUserTask(void){
+    OS_TCB *tcb=OSTCBList,*tar=0;
+    INT16U cur=OSTimeGet();
+
+    while(tcb){
+        if(tcb->OSTCBStat==OS_STAT_RDY&&tcb->OSTCBDly==0&&tcb->deadline_valid==1){ // ready user task
+            if(tar==0){
+                tar=tcb;
+            }else{
+                if((tcb->deadline-cur)<(tar->deadline-cur)){
+                    tar=tcb;
+                }else if((tcb->deadline-cur)==(tar->deadline-cur)){
+                    if(tcb->OSTCBPrio<tar->OSTCBPrio)tar=tcb;
+                }
+            }
+        }
+        tcb=tcb->OSTCBNext;
+    }
+
+    if(tar==0)return 255;
+    return tar->OSTCBPrio;
+}
+
 void  OSIntExit (void)
 {
 #if OS_CRITICAL_METHOD == 3                                /* Allocate storage for CPU status register */
     OS_CPU_SR  cpu_sr;
 #endif
-    INT8U idx;
+    INT8U idx,edut;
     
     if (OSRunning == TRUE) {
         OS_ENTER_CRITICAL();
@@ -186,6 +209,8 @@ void  OSIntExit (void)
         if ((OSIntNesting == 0) && (OSLockNesting == 0)) { /* Reschedule only if all ISRs complete ... */
             OSIntExitY    = OSUnMapTbl[OSRdyGrp];          /* ... and not locked.                      */
             OSPrioHighRdy = (INT8U)((OSIntExitY << 3) + OSUnMapTbl[OSRdyTbl[OSIntExitY]]);
+            edut=getEarliestDeadlineUserTask();
+            if(edut!=255)OSPrioHighRdy=edut;
             if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy */
                 idx=logs.num;
                 if(idx<MAXLOGNUM){
@@ -888,12 +913,14 @@ void  OS_Sched (void)
     OS_CPU_SR  cpu_sr;
 #endif    
     INT8U      y;
-    INT8U idx;
+    INT8U idx,edut;
 
     OS_ENTER_CRITICAL();
     if ((OSIntNesting == 0) && (OSLockNesting == 0)) { /* Sched. only if all ISRs done & not locked    */
         y             = OSUnMapTbl[OSRdyGrp];          /* Get pointer to HPT ready to run              */
         OSPrioHighRdy = (INT8U)((y << 3) + OSUnMapTbl[OSRdyTbl[y]]);
+        edut=getEarliestDeadlineUserTask();
+        if(edut!=255)OSPrioHighRdy=edut;
         if (OSPrioHighRdy != OSPrioCur) {              /* No Ctx Sw if current task is highest rdy     */
             idx=logs.num;
             if(idx<MAXLOGNUM){
@@ -1126,6 +1153,8 @@ INT8U  OS_TCBInit (INT8U prio, OS_STK *ptos, OS_STK *pbos, INT16U id, INT32U stk
         OSTCBList               = ptcb;
         OSRdyGrp               |= ptcb->OSTCBBitY;         /* Make task ready to run                   */
         OSRdyTbl[ptcb->OSTCBY] |= ptcb->OSTCBBitX;
+        ptcb->counter=0;
+        ptcb->deadline_valid=0;
         OS_EXIT_CRITICAL();
         return (OS_NO_ERR);
     }
