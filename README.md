@@ -32,7 +32,7 @@
 10	preempt         12	2
 12	complete        2	1
 13	complete        1	3
-15	preempt         3	2	<- This is OK cuz Tick ISR will reschedule making task2(deadline=20) preempt task3(deadline=20)
+15	preempt         3	2	<- This is OK cuz Tick ISR will reschedule and make task2(deadline=20) preempt task3(deadline=20)
 16	preempt         2	1
 17	complete        1	2
 18	complete        2	3
