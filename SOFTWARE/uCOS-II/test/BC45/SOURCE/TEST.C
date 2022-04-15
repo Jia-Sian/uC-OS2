@@ -99,7 +99,7 @@ void  TaskStart(void *pdata){
     OS_EXIT_CRITICAL();
     OSStatInit();                                          /* Initialize uC/OS-II's statistics         */
 
-    initSim(3);
+    initSim(2);
     while(1){
         OSTimeDly(OS_TICKS_PER_SEC);
         printLogs();

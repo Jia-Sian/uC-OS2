@@ -184,7 +184,7 @@ INT8U getEarliestDeadlineUserTask(void){
                 if((tcb->deadline-cur)<(tar->deadline-cur)){
                     tar=tcb;
                 }else if((tcb->deadline-cur)==(tar->deadline-cur)){
-                    if(tcb->OSTCBPrio<tar->OSTCBPrio)tar=tcb;
+                    if(tcb->OSTCBPrio==OSTCBCur->OSTCBPrio)tar=tcb;
                 }
             }
         }
