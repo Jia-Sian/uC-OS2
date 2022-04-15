@@ -175,6 +175,7 @@ INT8U getEarliestDeadlineUserTask(void){
     OS_TCB *tcb=OSTCBList,*tar=0;
     INT16U cur=OSTimeGet();
 
+    if(OSTCBCur->deadline_valid==1&&OSTCBCur->counter==OSTCBCur->cost)return OSTCBCur->OSTCBPrio;
     while(tcb){
         if(tcb->OSTCBStat==OS_STAT_RDY&&tcb->OSTCBDly==0&&tcb->deadline_valid==1){ // ready user task
             if(tar==0){

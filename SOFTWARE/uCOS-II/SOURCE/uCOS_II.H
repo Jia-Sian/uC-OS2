@@ -411,6 +411,7 @@ typedef struct os_tcb {
     INT32U counter;
     INT16U deadline_valid;
     INT16U deadline;
+    INT16U cost;
 } OS_TCB;
 
 /*$PAGE*/

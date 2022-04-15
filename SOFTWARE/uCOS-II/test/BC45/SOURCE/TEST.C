@@ -68,6 +68,7 @@ void initSim(INT8U num){
     for(i=0;i<num;++i){
         OSTCBPrioTbl[i+1]->deadline_valid=1;
         OSTCBPrioTbl[i+1]->deadline=jobs[i].p;
+        OSTCBPrioTbl[i+1]->cost=jobs[i].c;
     }
     OSTimeSet(0);
     OS_EXIT_CRITICAL();
